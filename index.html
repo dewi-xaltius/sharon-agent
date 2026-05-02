@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agentic AI Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8f7f5;
+      --surface: #ffffff;
+      --surface2: #f0ede8;
+      --border: #e0d8d0;
+      --accent: #E85D04;
+      --accent2: #7b61ff;
+      --accent3: #e03e3e;
+      --text: #1a1a2e;
+      --muted: #777777;
+      --card-h: 280px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* ── GRID BACKGROUND ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(232,93,4,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(232,93,4,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── LAYOUT ── */
+    #app {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      padding: 2rem 3rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 12px var(--accent); }
+      50% { opacity: 0.6; box-shadow: 0 0 24px var(--accent); }
+    }
+
+    .logo-text {
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .logo-text span { color: var(--accent); }
+
+    .header-badge {
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      border: 1px solid rgba(232,93,4,0.3);
+      padding: 0.3rem 0.8rem;
+      border-radius: 20px;
+      background: rgba(232,93,4,0.06);
+    }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 5rem 3rem 3rem;
+      text-align: center;
+      animation: fadeUp 0.8s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1.25rem;
+    }
+
+    .hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(2.8rem, 7vw, 5.5rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero h1 .accent { color: var(--accent); }
+
+    .hero p {
+      font-size: 0.95rem;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    /* ── AGENT GRID ── */
+    .agents-section {
+      flex: 1;
+      padding: 2rem 3rem 5rem;
+      animation: fadeUp 0.8s 0.2s ease both;
+    }
+
+    .section-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ── AGENT CARD ── */
+    .agent-card {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      height: var(--card-h);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      cursor: pointer;
+      overflow: hidden;
+      transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+    }
+
+    .agent-card:not(.coming-soon):hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+    }
+
+    .agent-card.coming-soon {
+      cursor: default;
+      opacity: 0.5;
+    }
+
+    .agent-card.search-card { --card-accent: var(--accent); }
+    .agent-card.analyst-card { --card-accent: var(--accent2); }
+    .agent-card.third-card { --card-accent: var(--accent3); }
+
+    .agent-card:not(.coming-soon):hover {
+      border-color: var(--card-accent);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 0 30px rgba(232,93,4,0.08);
+    }
+
+    .analyst-card:not(.coming-soon):hover {
+      box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 0 30px rgba(123,97,255,0.08);
+    }
+
+    /* card glow blob */
+    .agent-card::before {
+      content: '';
+      position: absolute;
+      top: -40%;
+      right: -20%;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: var(--card-accent);
+      opacity: 0.04;
+      filter: blur(40px);
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+
+    .agent-card:hover::before { opacity: 0.1; }
+
+    .card-top { display: flex; align-items: flex-start; justify-content: space-between; }
+
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+    }
+
+    .card-status {
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+    }
+
+    .status-live {
+      color: var(--accent);
+      background: rgba(232,93,4,0.08);
+      border: 1px solid rgba(232,93,4,0.25);
+    }
+
+    .status-soon {
+      color: var(--muted);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+    }
+
+    .card-body { margin-top: 1.25rem; }
+
+    .card-number {
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      margin-bottom: 0.4rem;
+    }
+
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 0.6rem;
+      color: var(--text);
+    }
+
+    .card-desc {
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-tag {
+      font-size: 0.65rem;
+      color: var(--card-accent);
+      letter-spacing: 0.08em;
+      opacity: 0.8;
+    }
+
+    .card-arrow {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      color: var(--muted);
+      transition: all 0.2s;
+    }
+
+    .agent-card:not(.coming-soon):hover .card-arrow {
+      border-color: var(--card-accent);
+      color: var(--card-accent);
+      background: rgba(232,93,4,0.08);
+    }
+
+    /* ── CHAT OVERLAY ── */
+    #chat-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(26,26,46,0.5);
+      backdrop-filter: blur(12px);
+      padding: 1.5rem;
+      animation: overlayIn 0.25s ease both;
+    }
+
+    @keyframes overlayIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    #chat-overlay.active { display: flex; }
+
+    .chat-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 780px;
+      height: 85vh;
+      max-height: 700px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: panelIn 0.3s ease both;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+    }
+
+    @keyframes panelIn {
+      from { opacity: 0; transform: scale(0.96) translateY(16px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    /* chat header */
+    .chat-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .chat-agent-info { display: flex; align-items: center; gap: 0.75rem; }
+
+    .chat-agent-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    .chat-agent-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .chat-agent-sub {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
+    }
+
+    .chat-close {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .chat-close:hover { border-color: var(--accent3); color: var(--accent3); }
+
+    /* API key bar */
+    .api-key-bar {
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      background: var(--surface2);
+      flex-shrink: 0;
+    }
+
+    .api-key-bar label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .api-key-bar input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .api-key-bar input:focus { border-color: var(--accent); }
+    .api-key-bar input::placeholder { color: var(--muted); }
+
+    /* messages */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      scroll-behavior: smooth;
+    }
+
+    .chat-messages::-webkit-scrollbar { width: 4px; }
+    .chat-messages::-webkit-scrollbar-track { background: transparent; }
+    .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .msg {
+      max-width: 85%;
+      animation: msgIn 0.2s ease both;
+    }
+
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg.user { align-self: flex-end; }
+    .msg.assistant { align-self: flex-start; }
+
+    .msg-bubble {
+      padding: 0.85rem 1.1rem;
+      border-radius: 14px;
+      font-size: 0.82rem;
+      line-height: 1.65;
+    }
+
+    .msg.user .msg-bubble {
+      background: rgba(232,93,4,0.08);
+      border: 1px solid rgba(232,93,4,0.2);
+      color: var(--text);
+      border-bottom-right-radius: 4px;
+    }
+
+    .msg.assistant .msg-bubble {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+      white-space: pre-wrap;
+    }
+
+    .msg-label {
+      font-size: 0.62rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      margin-bottom: 0.35rem;
+      text-transform: uppercase;
+    }
+
+    .msg.user .msg-label { text-align: right; }
+
+    /* typing indicator */
+    .typing .msg-bubble {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 1rem 1.1rem;
+    }
+
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: typingBounce 1.2s ease-in-out infinite;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-6px); opacity: 1; }
+    }
+
+    /* welcome message */
+    .chat-welcome {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--muted);
+    }
+
+    .chat-welcome .welcome-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+    .chat-welcome h3 { font-family: 'Syne', sans-serif; font-size: 1.1rem; color: var(--text); margin-bottom: 0.5rem; }
+    .chat-welcome p { font-size: 0.78rem; line-height: 1.6; max-width: 340px; margin: 0 auto 1.5rem; }
+
+    .suggestion-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+
+    .chip {
+      font-size: 0.72rem;
+      padding: 0.4rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--surface2);
+    }
+
+    .chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(232,93,4,0.06); }
+
+    /* chat input */
+    .chat-input-area {
+      padding: 1rem 1.5rem 1.25rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-end;
+      flex-shrink: 0;
+    }
+
+    #chat-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      outline: none;
+      resize: none;
+      min-height: 44px;
+      max-height: 120px;
+      transition: border-color 0.2s;
+      line-height: 1.5;
+    }
+
+    #chat-input:focus { border-color: var(--accent); }
+    #chat-input::placeholder { color: var(--muted); }
+
+    #send-btn {
+      background: var(--accent);
+      border: none;
+      border-radius: 10px;
+      width: 44px;
+      height: 44px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      color: var(--bg);
+      font-weight: 700;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    #send-btn:hover { background: #ff7a1f; transform: scale(1.05); }
+    #send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      border-top: 1px solid var(--border);
+    }
+
+    footer span { color: var(--accent); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      header { padding: 1.25rem 1.5rem; }
+      .hero { padding: 3rem 1.5rem 2rem; }
+      .agents-section { padding: 1.5rem 1.5rem 3rem; }
+      .agent-grid { grid-template-columns: 1fr; }
+      .chat-panel { height: 95vh; max-height: none; border-radius: 16px; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      <div class="logo-text">Xaltius <span>Academy</span></div>
+    </div>
+    <div class="header-badge">Live Demo Environment</div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-label">// Xaltius Academy × Optimaxx</div>
+    <h1>Agentic AI<br><span class="accent">Demo</span></h1>
+    <p>Explore autonomous AI agents that reason, search, and act. Click any agent below to see it in action.</p>
+  </section>
+
+  <!-- AGENTS -->
+  <section class="agents-section">
+    <div class="section-label">Select an agent to begin</div>
+    <div class="agent-grid">
+
+      <!-- Card 1: Search Agent (LIVE) -->
+      <div class="agent-card search-card" onclick="openChat('search')">
+        <div class="card-top">
+          <div class="card-icon">🔍</div>
+          <div class="card-status status-live">● Live</div>
+        </div>
+        <div class="card-body">
+          <div class="card-number">Agent 01</div>
+          <div class="card-title">Search Agent</div>
+          <div class="card-desc">Searches the web, synthesises findings, and delivers structured research reports on any topic.</div>
+        </div>
+        <div class="card-footer">
+          <div class="card-tag">Web Search · Research · Indonesia</div>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+
+      <!-- Card 2: Data Analyst (Coming Soon) -->
+      <div class="agent-card analyst-card coming-soon">
+        <div class="card-top">
+          <div class="card-icon">📊</div>
+          <div class="card-status status-soon">Coming Soon</div>
+        </div>
+        <div class="card-body">
+          <div class="card-number">Agent 02</div>
+          <div class="card-title">Data Analyst</div>
+          <div class="card-desc">Analyses datasets, generates insights, and produces visualisations from structured data sources.</div>
+        </div>
+        <div class="card-footer">
+          <div class="card-tag">Data · Insights · Visualisation</div>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+
+      <!-- Card 3: Workflow Agent (Coming Soon) -->
+      <div class="agent-card third-card coming-soon">
+        <div class="card-top">
+          <div class="card-icon">⚡</div>
+          <div class="card-status status-soon">Coming Soon</div>
+        </div>
+        <div class="card-body">
+          <div class="card-number">Agent 03</div>
+          <div class="card-title">Workflow Agent</div>
+          <div class="card-desc">Orchestrates multi-step tasks across tools, APIs, and data sources to automate complex workflows.</div>
+        </div>
+        <div class="card-footer">
+          <div class="card-tag">Automation · MCP · Multi-step</div>
+          <div class="card-arrow">→</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>
+    Built with <span>Agentic AI</span> · Xaltius Academy × Optimaxx · Q2 2026
+  </footer>
+</div>
+
+<!-- CHAT OVERLAY -->
+<div id="chat-overlay">
+  <div class="chat-panel">
+
+    <!-- Chat Header -->
+    <div class="chat-header">
+      <div class="chat-agent-info">
+        <div class="chat-agent-dot"></div>
+        <div>
+          <div class="chat-agent-name" id="chat-agent-name">Sharon — Search Agent</div>
+          <div class="chat-agent-sub">gpt-5.4 · Web Search enabled</div>
+        </div>
+      </div>
+      <button class="chat-close" onclick="closeChat()">✕</button>
+    </div>
+
+    <!-- API Key Bar -->
+    <div class="api-key-bar">
+      <label>API Key</label>
+      <input type="password" id="api-key-input" placeholder="sk-proj-... (your OpenAI API key)" />
+    </div>
+
+    <!-- Messages -->
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-welcome" id="chat-welcome">
+        <div class="welcome-icon">🔍</div>
+        <h3>Meet Sharon</h3>
+        <p>Your AI Research Assistant specialising in Indonesian business and technology trends. Enter your OpenAI API key above and ask me anything.</p>
+        <div class="suggestion-chips">
+          <div class="chip" onclick="sendChip(this)">Top AI use cases in Indonesian e-commerce</div>
+          <div class="chip" onclick="sendChip(this)">How are Indonesian banks using AI agents?</div>
+          <div class="chip" onclick="sendChip(this)">Agentic AI career opportunities in Indonesia</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="chat-input-area">
+      <textarea id="chat-input" placeholder="Ask Sharon to research anything..." rows="1"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button id="send-btn" onclick="sendMessage()">↑</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const WORKFLOW_ID = 'wf_69e7299f2ed88190ab438d6cf150d1780f693660040c4f5b';
+  const SHARON_INSTRUCTIONS = `You are Sharon, an expert AI Research Assistant specialising in Indonesian business and technology trends.
+
+For every user request, you must follow this exact workflow:
+
+1. SEARCH: Use the Search tool to find relevant, reputable articles or sources about the requested topic. Always search in English and Bahasa Indonesia where possible to get local perspectives.
+
+2. ANALYSE: Read and synthesise the key findings. Look for Indonesia-specific data, statistics, and real company examples where available.
+
+3. DRAFT REPORT: Write a structured report in Markdown format with these sections:
+   - **Title**: A clear, professional title
+   - **Executive Summary**: A 3-sentence summary of the main findings
+   - **Key Findings**: A bulleted list of the most important facts and data points
+   - **Indonesian Context**: Real examples or case studies from Indonesian businesses
+   - **Conclusion & Implications**: What this means for businesses or careers in Indonesia
+
+Always cite your sources at the end of the report.
+Keep your tone professional but easy to understand for a non-technical audience.`;
+
+  let conversationHistory = [];
+  let isLoading = false;
+
+  function openChat(type) {
+    document.getElementById('chat-overlay').classList.add('active');
+    document.getElementById('chat-input').focus();
+  }
+
+  function closeChat() {
+    document.getElementById('chat-overlay').classList.remove('active');
+  }
+
+  // Close on backdrop click
+  document.getElementById('chat-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeChat();
+  });
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function sendChip(el) {
+    const text = el.textContent;
+    document.getElementById('chat-input').value = text;
+    sendMessage();
+  }
+
+  function appendMessage(role, content) {
+    const welcome = document.getElementById('chat-welcome');
+    if (welcome) welcome.remove();
+
+    const messages = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+
+    const label = role === 'user' ? 'You' : 'Sharon';
+    div.innerHTML = `
+      <div class="msg-label">${label}</div>
+      <div class="msg-bubble">${content}</div>
+    `;
+
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+    return div;
+  }
+
+  function showTyping() {
+    const welcome = document.getElementById('chat-welcome');
+    if (welcome) welcome.remove();
+
+    const messages = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = 'msg assistant typing';
+    div.id = 'typing-indicator';
+    div.innerHTML = `
+      <div class="msg-label">Sharon</div>
+      <div class="msg-bubble">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    `;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function removeTyping() {
+    const t = document.getElementById('typing-indicator');
+    if (t) t.remove();
+  }
+
+  async function sendMessage() {
+    if (isLoading) return;
+
+    const input = document.getElementById('chat-input');
+    const apiKeyInput = document.getElementById('api-key-input');
+    const userText = input.value.trim();
+    const apiKey = apiKeyInput.value.trim();
+
+    if (!userText) return;
+
+    if (!apiKey) {
+      apiKeyInput.style.borderColor = 'var(--accent3)';
+      apiKeyInput.placeholder = 'Please enter your OpenAI API key first';
+      apiKeyInput.focus();
+      setTimeout(() => {
+        apiKeyInput.style.borderColor = '';
+        apiKeyInput.placeholder = 'sk-proj-... (your OpenAI API key)';
+      }, 3000);
+      return;
+    }
+
+    isLoading = true;
+    input.value = '';
+    input.style.height = 'auto';
+    document.getElementById('send-btn').disabled = true;
+
+    appendMessage('user', userText);
+    conversationHistory.push({ role: 'user', content: userText });
+    showTyping();
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-5.4',
+          instructions: SHARON_INSTRUCTIONS,
+          tools: [{ type: 'web_search_preview' }],
+          input: conversationHistory
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'API error');
+      }
+
+      // Extract text from response
+      let assistantText = '';
+      if (data.output) {
+        for (const block of data.output) {
+          if (block.type === 'message' && block.content) {
+            for (const c of block.content) {
+              if (c.type === 'output_text') assistantText += c.text;
+            }
+          }
+        }
+      }
+
+      if (!assistantText) assistantText = 'Sorry, I could not generate a response. Please try again.';
+
+      removeTyping();
+      conversationHistory.push({ role: 'assistant', content: assistantText });
+      appendMessage('assistant', assistantText);
+
+    } catch (err) {
+      removeTyping();
+      appendMessage('assistant', `⚠️ Error: ${err.message}\n\nPlease check your API key and try again.`);
+    }
+
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    input.focus();
+  }
+</script>
+</body>
+</html>
